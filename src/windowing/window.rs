@@ -43,6 +43,25 @@ impl Window {
         };
     }
 
+    pub fn create_opengl_context(&self) -> gl46::GlFns {
+        let result: Result<gl46::GlFns, &str> = unsafe { gl46::GlFns::load_from(&|u8_ptr|{ 
+            let str = std::ffi::CStr::from_ptr(u8_ptr as *const i8);      
+            let mut address = self.glfw_instance.get_proc_address_raw(str.to_str().unwrap());
+            if address.is_null() {
+                println!("WARNING: a OpenGL function's proc address could not be found!");
+                address = 0x11111 as *const libc::c_void;
+            }
+            return address;
+        })};
+
+        if result.is_err() {
+            panic!("Failure to create opengl context.");
+        }
+        else {
+            return result.unwrap();
+        }
+    }
+
     pub fn should_close(&self) -> bool {
         return self.glfw_window.should_close();
     }

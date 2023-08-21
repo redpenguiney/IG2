@@ -1,54 +1,35 @@
-use arc_swap::ArcSwap;
-use glm::I64Vec3;
+use crate::transform::Transform;
+use nalgebra_glm::{*};
 
-use crate::engine::{gameobject::GameObject, transform::{ObjectTransform, i64vec3}, core::EngineAPIs};
-
-// use super::meshobject::CAMERA_POS;
-
-lazy_static! {
-    pub static ref CAMERA_POS: ArcSwap<I64Vec3> = ArcSwap::from_pointee(i64vec3(0, 0, 0)); // using arcswap instead of rwlock was supposed to be faster, no effect lol
+pub struct MeshObject {
+    pub name: String,
+    pub transform: Transform,
+    color: Vec4,
+    texture_z: f32,
+    mesh_id: usize, // uuid of Mesh, so we know when two cube meshes/etc. are the same and can be instanced
+    draw_id: usize, //uuid for this individual object that will be drawn so it can be removed
+    color_changed: bool,
+    texture_z_changed: bool,
 }
 
-pub trait Renderable: GameObject + ObjectTransform {
-    fn mesh_update(&mut self, apis: &mut EngineAPIs);
+impl MeshObject {
+    pub fn new(mesh_id: usize) -> Self {
+        let obj = Self { 
+            name: String::from("MeshObject"),
+            mesh_id: mesh_id,
+            draw_id: 0,
 
-    fn set_rgba(&mut self, color: glm::Vec4);
+            transform: Transform::empty(), 
+            color: vec4(0.6, 0.6, 0.6, 0.5),
+            texture_z: -1.0,
 
-    fn set_texture_z(&mut self, texz: f32);
-}
-
-#[macro_export]
-macro_rules! impl_renderable {
-    ($structname: ident) => {
-        
-        
-        
-        impl crate::Renderable for $structname {
-            
-            
-            fn mesh_update(&mut self, apis: &mut crate::engine::core::EngineAPIs) {
-                use {crate::engine::gameobjects::renderable::CAMERA_POS};
-                let cp = CAMERA_POS.load();
-                let model = self.transform.get_model(&cp);
-                
-                //println!("Getting model elapsed {:?}", now.elapsed());
-                apis.mesh_master.set_transform(self.mesh_id, 0, &model);
-                
-                if self.color_changed {
-                    apis.mesh_master.set_rgba(self.mesh_id, 0, self.color);
-                }
-                if self.texz_changed {
-                    apis.mesh_master.set_texture_z(self.mesh_id, 0, self.texz);
-                }
-            }
-
-            fn set_rgba(&mut self, color: glm::Vec4) {
-                self.color = color;
-            }
-        
-            fn set_texture_z(&mut self, texz: f32) {
-                self.texz = texz;
-            }
-        }  
+            color_changed: true,
+            texture_z_changed: true,
+        };
+        return obj;
     }
 }
+
+impl_gameobject!(MeshObject);
+impl_renderable!(MeshObject);
+crate::impl_transform!(MeshObject);
