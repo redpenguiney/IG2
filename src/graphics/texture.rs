@@ -1,5 +1,6 @@
 use stb_image::image::*;
 use gl46::*;
+use crate::graphics::*;
 
 #[derive(PartialEq)]
 pub enum TextureType {

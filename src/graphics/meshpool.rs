@@ -1,16 +1,18 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use crate::graphics::*;
+use gl46::*;
 
-const TARGET_MESHPOOL_BASE_SIZE: isize = (2 as isize).pow(24); // ~16MB
+pub const TARGET_MESHPOOL_BASE_SIZE: isize = (2 as isize).pow(24); // ~16MB
 
 // Contains a bunch of meshes of the same size for rapid drawing with special opengl stuff. internally used by MeshMaster
-struct MeshPool {
-    mesh_vertex_nbytes: isize,
-    mesh_index_nbytes: isize,
-    base_mesh_capacity: isize,
-    mesh_capacity: isize,
-    base_instanced_data_capacity: isize,
-    instance_nbytes: isize,
-    instanced_data_capacity: isize,
+pub struct MeshPool {
+    pub mesh_vertex_nbytes: isize,
+    pub mesh_index_nbytes: isize,
+    pub base_mesh_capacity: isize,
+    pub mesh_capacity: isize,
+    pub base_instanced_data_capacity: isize,
+    pub instance_nbytes: isize,
+    pub instanced_data_capacity: isize,
 
     draw_commands: Vec<IndirectDrawCommand>,
     drawcount: i32,
@@ -40,7 +42,7 @@ struct MeshPool {
 }
 
 impl MeshPool {
-    fn new(gl: &gl46::GlFns, n_meshes: isize, n_instances: isize, sizeof_verts: isize, sizeof_indices: isize) -> Self { // should probably make indbo/ssbo here instead of in expand()
+    pub fn new(gl: &gl46::GlFns, n_meshes: isize, n_instances: isize, sizeof_verts: isize, sizeof_indices: isize) -> Self { // should probably make indbo/ssbo here instead of in expand()
         // println!("capacity {}, bytes per is {}", n_meshes, sizeof_verts);
         
         let mut new_pool = Self {
@@ -82,7 +84,7 @@ impl MeshPool {
         return new_pool;
     }
 
-    fn cleanup(&mut self, gl: &gl46::GlFns) {
+    pub fn cleanup(&mut self, gl: &gl46::GlFns) {
         self.del_vertex_buffers(gl);
         MeshPool::del_instanced_buffers(gl, &mut self.mvbo);
     }
@@ -156,7 +158,7 @@ impl MeshPool {
         }
     }
 
-    fn set_transform(&self, slot: i32, instance: i32, matrix: &glm::Mat4) {
+    pub fn set_transform(&self, slot: i32, instance: i32, matrix: &glm::Mat4) {
         unsafe {
             let instance_slot = (self.vertex_slots_to_instanced_slots[&slot] + instance) as isize;
             assert!(instance_slot < self.instanced_data_capacity, "Error: We were told to modify the transform for slot {}, but there are only {} slots.", instance_slot, self.instanced_data_capacity);
@@ -173,7 +175,7 @@ impl MeshPool {
         }
     }
 
-    fn set_rgba(&self, slot: i32, instance: i32, color: &glm::Vec4) {
+    pub fn set_rgba(&self, slot: i32, instance: i32, color: &glm::Vec4) {
         unsafe {
             let instance_slot = (self.vertex_slots_to_instanced_slots[&slot] + instance) as isize;
             assert!(instance_slot < self.instanced_data_capacity);
@@ -181,7 +183,7 @@ impl MeshPool {
         }
     }
 
-    fn set_texture_z(&self, slot: i32, instance: i32, tex: &f32) { 
+    pub fn set_texture_z(&self, slot: i32, instance: i32, tex: &f32) { 
         unsafe {
             let instance_slot = (self.vertex_slots_to_instanced_slots[&slot] + instance) as isize;
             assert!(instance_slot < self.instanced_data_capacity);
@@ -199,7 +201,7 @@ impl MeshPool {
     //     }
     // }
 
-    fn del_vertex_buffers(&mut self, gl: &gl46::GlFns) {
+    pub fn del_vertex_buffers(&mut self, gl: &gl46::GlFns) {
         unsafe {
             let vaoptr: *mut GLuint = &mut self.vao;
             gl.DeleteVertexArrays(1, vaoptr);
@@ -215,7 +217,7 @@ impl MeshPool {
 
     // *buffer
     // also not a method because of the borrow checker
-    fn del_instanced_buffers(gl: &gl46::GlFns, mvbo: &mut GLuint) {
+    pub fn del_instanced_buffers(gl: &gl46::GlFns, mvbo: &mut GLuint) {
         unsafe {
             let mvboptr: *mut GLuint = mvbo;
             gl.DeleteBuffers(1, mvboptr);
@@ -224,7 +226,7 @@ impl MeshPool {
 
     // called when mesh pool runs out of space
     // TODO: should check opengl version and not use coherent_bit/persistent_bit and use glBufferSubData if persistent mapping is unsupported
-    fn expand_vbo(&mut self, gl: &gl46::GlFns) {
+    pub fn expand_vbo(&mut self, gl: &gl46::GlFns) {
         // println!("Expanding mesh pool.");
         let old_cap = self.mesh_capacity;
         for i in 0..self.base_mesh_capacity {
@@ -500,7 +502,7 @@ impl MeshPool {
     // if the mesh is not dynamic (meaning its vertices will never be modified), then it might be instanced for optimization
     // returns a tuple of (slot, instance) although instance will always be 0 unless it was instanced 
         // if count > 0, instance will be for the first one
-    fn add_mesh(&mut self, gl: &gl46::GlFns, mesh_uuid: i32, vertices:&Vec<GLfloat>, indices:&Vec<GLuint>, count: u32, dynamic: bool) -> (i32, i32) {
+    pub fn add_mesh(&mut self, gl: &gl46::GlFns, mesh_uuid: i32, vertices:&Vec<GLfloat>, indices:&Vec<GLuint>, count: u32, dynamic: bool) -> (i32, i32) {
         let now = std::time::Instant::now();
         let result : (bool, i32, i32) = self.try_extend_instance(gl, count, mesh_uuid);
         // println!("Attempting to extend the instance took {:?} seconds.", now.elapsed());
@@ -560,7 +562,7 @@ impl MeshPool {
         self.update_indbo(slot);
     }
 
-    fn remove_mesh(&mut self, slot:i32) {
+    pub fn remove_mesh(&mut self, slot:i32) {
         self.drawcount -= 1;
         if self.slot_contents.contains_key(&slot) {
             self.slot_contents.remove(&slot);
@@ -570,7 +572,7 @@ impl MeshPool {
         self.update_indbo(slot);
     }
     
-    fn draw(&self, gl: &gl46::GlFns) { 
+    pub fn draw(&self, gl: &gl46::GlFns) { 
         //println!("Drawing!");
         unsafe {
              

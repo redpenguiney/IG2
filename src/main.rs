@@ -4,7 +4,9 @@ extern crate nalgebra_glm as glm;
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{gameobjects::{GameObject, Renderable}, graphics::Mesh};
+use glm::vec3;
+
+use crate::{gameobjects::{GameObject, Renderable}, graphics::Mesh, transform::dvec3};
 
 mod transform;
 mod graphics;
@@ -18,10 +20,10 @@ fn main() {
 
 fn application() {
     println!("Initializing application.");
-
     //let mut GAMEOBJECTS: Vec<Rc<RefCell<dyn GameObject>>> = Vec::new();
     let mut WINDOW = windowing::Window::new(String::from("POG"));
     let mut GE = graphics::GraphicsEngine::new(WINDOW.create_opengl_context(), WINDOW.size as (u32, u32));
+    GE.freecam_override_enabled = true;
 
     println!("Starting main loop");
 
@@ -30,6 +32,8 @@ fn application() {
     GE.add_renderable(test.clone());
     //GAMEOBJECTS.push(test.clone());
     
+    GE.camera.transform.setpos_meters(dvec3(0.0, 0.0, 10.0));
+
     while !WINDOW.should_close() {
         WINDOW.update();
 

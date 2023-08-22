@@ -1,20 +1,37 @@
 use crate::Renderable;
-
+use crate::graphics::*;
+use crate::windowing::*;
+use crate::transform::*;
 use std::{cell::RefCell, rc::Rc};
 use std::collections::HashMap;
+use gl46::*;
+use glm::Vec2;
+use glm::vec2;
+use glfw::Key;
+use glm::vec3;
 
-// there are a lot of different uuids here so:
+// there are many different uuids here so for clarification:
 // mesh_uuid: each Mesh has one
-// 
+// draw_uuid: each gameobject implementing Renderable has one
+// shaders, textures, & framebuffers have their own ids as well but opengl takes care of that for us
+
+
 
 pub struct GraphicsEngine {
     gl: gl46::GlFns,
+
+    resolution: (u32, u32),
     
     pub world_shader_id: u32,
     pub camera: Camera,
 
+    pub freecam_override_enabled: bool,
+    freecam_transform: Transform,
+    freecam_pitchyaw: Vec2,
+    freecam_speed: i64,
+
     // draw everything to this framebuffer's texture, then render a quad to the screen with that texture so we can do post proc
-    postproc_texture_framebuffer: Framebuffer, 
+    postproc_framebuffer_id: u32, 
     postproc_shader_id: u32,
 
     renderable_gameobjects: HashMap<usize, Rc<RefCell<dyn Renderable>>>,
@@ -22,7 +39,7 @@ pub struct GraphicsEngine {
     pools: HashMap<GLuint /*(shader program id)*/, HashMap<u32 /*(texture/texture array id)*/, Vec<MeshPool>>>,
     shaders: HashMap<u32, ShaderProgram>, // key is program id
     textures: HashMap<u32, Texture>, // key is gl texture id
-    //framebuffers: HashMap<u32, Framebuffer>, // key is gl framebuffer id
+    framebuffers: HashMap<u32, Framebuffer>, // key is gl framebuffer id
 
     // tells how to get to the drawing data for a particular object from its draw id
     object_drawing_data_locations: HashMap<usize, (u32, u32, usize, i32, i32)>, // tuple is (programid, textureid, index in vector, slot within meshpool, instance offset)
@@ -43,13 +60,20 @@ pub struct GraphicsEngine {
 
 impl GraphicsEngine {
     pub fn new(gl_context: gl46::GlFns, resolution: (u32, u32)) -> Self {
-        let postproc_texture_framebuffer = Framebuffer::new(&gl_context, resolution.0, resolution.1, true, false);
         let mut ge = Self {
             gl: gl_context,
 
+            resolution: resolution,
+
             world_shader_id: 0,
             camera: Camera::new(),
-            postproc_texture_framebuffer: postproc_texture_framebuffer,
+
+            freecam_override_enabled: false,
+            freecam_pitchyaw: vec2(0.0, 0.0),
+            freecam_speed: 0,
+            freecam_transform: Transform::new(i64vec3(0, -3000000, -10000000)),
+
+            postproc_framebuffer_id: 0,
             postproc_shader_id: 0,
 
             renderable_gameobjects: HashMap::new(),
@@ -57,7 +81,7 @@ impl GraphicsEngine {
             pools: HashMap::new(),
             shaders: HashMap::new(),
             textures: HashMap::new(),
-            //framebuffers: HashMap::new(),
+            framebuffers: HashMap::new(),
             object_drawing_data_locations: HashMap::new(),
 
             cached_meshes_to_add: HashMap::new(),
@@ -69,6 +93,9 @@ impl GraphicsEngine {
         };
         
         ge.postproc_shader_id = ge.load_shader("shaders/postproc_vertex.glsl", "shaders/postproc_fragment.glsl", vec!["screenTexture"]);
+        let postproc_framebuffer = Framebuffer::new(&ge.gl, resolution.0, resolution.1, true, false);
+        ge.postproc_framebuffer_id = postproc_framebuffer.gl_framebuffer;
+        ge.load_framebuffer(postproc_framebuffer);
         ge.world_shader_id = ge.load_shader("shaders/world_vertex.glsl", "shaders/world_fragment.glsl", vec!["textures", "shadowmap"]);
         ge.setup_screen_quad();
 
@@ -76,6 +103,7 @@ impl GraphicsEngine {
         unsafe {
             ge.gl.Enable(gl46::GL_DEBUG_OUTPUT);
             ge.gl.DebugMessageCallback(Some(opengl_debug_callback), std::ptr::null());
+            ge.gl.ClearColor(0.5, 0.5, 0.8, 1.0);
         }
 
         return ge;
@@ -109,8 +137,10 @@ impl GraphicsEngine {
     }
 
     pub fn update_resolution(&mut self, resolution: (u32, u32)) {
-        self.postproc_texture_framebuffer.cleanup(&self.gl);
-        self.postproc_texture_framebuffer = Framebuffer::new(&self.gl, resolution.0, resolution.1, true, false);
+        self.resolution = resolution;
+        let postproc_framebuffer = Framebuffer::new(&self.gl, resolution.0, resolution.1, true, false);
+        self.postproc_framebuffer_id = postproc_framebuffer.gl_framebuffer;
+        self.load_framebuffer(postproc_framebuffer);
     }
 
     // returns shader id
@@ -130,15 +160,28 @@ impl GraphicsEngine {
         return (id, size);
     }
 
-    // does floating origin, updates instanced data buffers, all prerendering work
+    fn load_framebuffer(&mut self, framebuffer: Framebuffer) {
+        self.framebuffers.insert(framebuffer.gl_framebuffer, framebuffer);
+    }
+
+    // does floating origin, updates instanced data buffers, sets camera matrices, all prerendering work
     pub fn update(&mut self) {
+        self.update_freecam();
         self.add_cached_renderables();
+        self.update_camera_matrices();
+
+        // Update the data on the gpu for objects that have moved/changed color/etc
+        let mut camera_pos = self.camera.transform.pos(); // for floating origin, the objects positions are offset by camera position on the cpu, so camera always at 0,0,0
+        if self.freecam_override_enabled {
+            camera_pos = self.freecam_transform.pos();
+        }
+        camera_pos *= -1;
 
         for (_, obj_refcell) in self.renderable_gameobjects.iter_mut() {
             let obj = obj_refcell.borrow();
             let draw_id = obj.get_draw_id();
             let loc = self.object_drawing_data_locations[&draw_id];
-            self.pools.get(&loc.0).unwrap().get(&loc.1).unwrap().get(loc.2).unwrap().set_transform(loc.3, loc.4, &obj.transform().get_model(&self.camera.transform.pos()));
+            self.pools.get(&loc.0).unwrap().get(&loc.1).unwrap().get(loc.2).unwrap().set_transform(loc.3, loc.4, &obj.transform().get_model(&camera_pos));
             if obj.get_color_changed() {
                 self.pools.get(&loc.0).unwrap().get(&loc.1).unwrap().get(loc.2).unwrap().set_rgba(loc.3, loc.4, &obj.get_rgba());
             };
@@ -150,7 +193,11 @@ impl GraphicsEngine {
     }
 
     pub fn draw(&mut self) {
-
+        unsafe {
+            self.gl.Clear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        }
+        self.draw_to_framebuffer(&vec![self.world_shader_id], self.postproc_framebuffer_id, self.resolution);
+        self.present_framebuffer(self.postproc_framebuffer_id, self.postproc_shader_id);
     }
 
     pub fn cleanup(&mut self) {
@@ -162,7 +209,9 @@ impl GraphicsEngine {
             shader.cleanup(&self.gl);
         }
 
-        self.postproc_texture_framebuffer.cleanup(&self.gl);
+        for (_, framebuffer) in self.framebuffers.iter() {
+            framebuffer.cleanup(&self.gl);
+        }
 
         for (_, hashmapthing) in self.pools.iter_mut() {
             for (_, vecofpools) in hashmapthing.iter_mut() {
@@ -282,7 +331,9 @@ impl GraphicsEngine {
     }
 
     // Given the id of a framebuffer that covers the WHOLE screen, it will draw a quad with that framebuffer's color texture over the screen using the given shader 
-    fn present_framebuffer(&self, buffer: &Framebuffer, shader_id: u32) {
+    fn present_framebuffer(&self, buffer_id: u32, shader_id: u32) {
+        let buffer = &self.framebuffers[&buffer_id];
+
         unsafe {
             self.shaders[&shader_id].r#use(&self.gl);
             buffer.color.as_ref().unwrap().r#use(&self.gl, 0);
@@ -293,10 +344,11 @@ impl GraphicsEngine {
 
     // draws everything associated with the given shader programs into the given framebuffer.
     // shaders should probably actually be compatible with the given framebuffer
-    fn draw_to_framebuffer(&mut self, shader_ids: &Vec<GLuint>, buffer: &mut Framebuffer, windowresx: u32, windowresy: u32) { 
+    fn draw_to_framebuffer(&mut self, shader_ids: &Vec<GLuint>, buffer_id: u32, resolution: (u32, u32)) { 
         unsafe {
             self.gl.CullFace(GL_BACK);
         }
+        let buffer = &self.framebuffers[&buffer_id];
         buffer.begin_render(&self.gl);
         for id in shader_ids {
             self.shaders[id].r#use(&self.gl);
@@ -320,6 +372,55 @@ impl GraphicsEngine {
                 }
             }
         }
-        buffer.finish_render(&self.gl, windowresx, windowresy)
+        buffer.finish_render(&self.gl, resolution.0, resolution.1)
     }
+
+    fn update_camera_matrices(&mut self) {
+        // Pass camera matrices to shader programs that want them
+        {
+            self.camera.perspective(self.resolution.0 as f32/self.resolution.1 as f32, 70.0, 0.1, 4096.0);
+        }
+        let mut cam_mat = self.camera.transform.get_model(&self.camera.transform.pos());
+
+        if self.freecam_override_enabled {
+            self.update_freecam();
+            cam_mat = self.freecam_transform.get_model(&self.freecam_transform.pos());
+        }
+
+        for program in self.shaders.iter_mut() {
+            if program.1.auto_cam {
+                //println!("autocamming {}", program.0);
+                program.1.matrix4x4(&self.gl, &String::from("camera"), &cam_mat, false);
+            }
+            if program.1.auto_proj && self.camera.proj_changed {
+                
+                program.1.matrix4x4(&self.gl, &String::from("proj"), self.camera.get_proj(), false);
+            }
+        }
+    }
+
+    // a toggleable freecam exists for debugging purposes, this function controls its pos/rotation
+    fn update_freecam(&mut self) {
+        if self.freecam_override_enabled {
+
+            let right = self.freecam_transform.get_right_vector() * (INPUT.is_pressed(Key::D) as i32 as f32 - INPUT.is_pressed(Key::A) as i32 as f32);
+            let up = self.freecam_transform.get_up_vector() * (INPUT.is_pressed(Key::E) as i32 as f32 - INPUT.is_pressed(Key::Q) as i32 as f32);
+            let forward = self.freecam_transform.get_look_vector() * (INPUT.is_pressed(Key::S) as i32 as f32 - INPUT.is_pressed(Key::W) as i32 as f32);
+            self.freecam_transform.setpos(self.freecam_transform.pos() - (i64vec3_from_vec3(&(&(right/100.0 + forward/100.0 + up/100.0))) * self.freecam_speed));
+            self.freecam_pitchyaw += INPUT.mouse_delta().yx() * 0.005;
+            self.freecam_pitchyaw.x = self.freecam_pitchyaw.x.clamp(-89.0f32.to_radians(), 89.0f32.to_radians());
+            self.freecam_transform.setrotyxz(vec3(self.freecam_pitchyaw.x, self.freecam_pitchyaw.y, 0.0));
+            
+            if INPUT.is_pressed(Key::A) || INPUT.is_pressed(Key::D) || INPUT.is_pressed(Key::S) || INPUT.is_pressed(Key::W) || INPUT.is_pressed(Key::Q) || INPUT.is_pressed(Key::E) {
+                self.freecam_speed += 1;
+                println!("OMG ");
+            }
+            else {
+                self.freecam_speed = 0;
+            }
+            //println!("look vector: {:?}",  self.freecam_transform.get_look_vector());
+            //println!("rot:{:?}", self.freecam_transform.rot());
+        }
+    }
+
 }

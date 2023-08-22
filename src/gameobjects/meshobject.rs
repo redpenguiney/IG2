@@ -1,6 +1,6 @@
 use crate::transform::Transform;
 use nalgebra_glm::{*};
-
+use crate::*;
 pub struct MeshObject {
     pub name: String,
     pub transform: Transform,

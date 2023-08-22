@@ -10,7 +10,9 @@
 //     }
 // }
 
+use gl46::*;
+use crate::graphics::*;
 // opengl calls this when error
-unsafe extern  "system" fn opengl_debug_callback(source: GLenum, error_type: GLenum, id: GLuint, severity: GLenum, length: i32, message: *const u8, userdata: *const c_void) {
+pub unsafe extern  "system" fn opengl_debug_callback(source: GLenum, _error_type: GLenum, _id: GLuint, _severity: GLenum, length: i32, message: *const u8, _userdata: *const c_void) {
     panic!("an OpenGL error:\n\tSource: {:?}, \n\tMessage: {}", source, String::from_raw_parts(message.cast_mut(), length as usize, 1024))
 }

@@ -1,12 +1,13 @@
-use gl46::{GL_FRAMEBUFFER, GL_FRAMEBUFFER_COMPLETE, GL_RENDERBUFFER, GL_DEPTH_COMPONENT, GL_DEPTH_ATTACHMENT, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, GL_DEPTH_BUFFER_BIT, GL_COLOR_BUFFER_BIT, GL_NONE, GL_TEXTURE_2D_MULTISAMPLE};
+use gl46::{GL_FRAMEBUFFER, GL_FRAMEBUFFER_COMPLETE, GL_DEPTH_ATTACHMENT, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, GL_DEPTH_BUFFER_BIT, GL_COLOR_BUFFER_BIT, GL_NONE};
+use crate::graphics::*;
 
 // Attach textures and depth buffers to framebuffer, and then render to framebuffer
 // Needed for lighting, tv screens, postprocessing, etc.
 pub struct Framebuffer {
-   gl_framebuffer: u32,
-   gl_depth_renderbuffer: u32, // not to be confused with the depth texture we're writing to, this just allows for depth testing while drawing, although not sure if i actually need it yet
-   width: u32,
-   height: u32,
+   pub gl_framebuffer: u32,
+   pub gl_depth_renderbuffer: u32, // not to be confused with the depth texture we're writing to, this just allows for depth testing while drawing, although not sure if i actually need it yet
+   pub width: u32,
+   pub height: u32,
    pub depth: Option<Texture>,
    pub color: Option<Texture>,
 }
@@ -18,7 +19,7 @@ impl Framebuffer {
             // check_graphics_errors();
 
             let mut buffer: u32 = 0; // yes it does need to be mutable 
-            gl.GenFramebuffers(1, &buffer as *const u32 as *mut u32);
+            gl.GenFramebuffers(1, &mut buffer as *mut u32);
             gl.BindFramebuffer(GL_FRAMEBUFFER, buffer);
             //println!("buffer is now {}", buffer);
 
@@ -89,13 +90,15 @@ impl Framebuffer {
     }
 
     pub fn begin_render_at_pos(&self, gl: &gl46::GlFns, x: i32, y: i32, xsize: u32, ysize: u32) {
+        assert!(xsize <= self.width && ysize <= self.height, "Invalid values for size in begin_render_at_pos()");
+
         unsafe {
             // check_graphics_errors();
             gl.BindFramebuffer(GL_FRAMEBUFFER, self.gl_framebuffer);
             // check_graphics_errors();
             gl.Clear(GL_DEPTH_BUFFER_BIT|GL_COLOR_BUFFER_BIT);
             // check_graphics_errors();
-            gl.Viewport(x, y, self.width as i32, self.height as i32);
+            gl.Viewport(x, y, xsize as i32, ysize as i32);
             // check_graphics_errors();
         }
     }

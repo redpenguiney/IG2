@@ -4,6 +4,7 @@
 use std::fs;
 
 use gl46::*;
+use crate::graphics::*;
 
 struct Shader {
     shader_type : GLenum,
@@ -55,13 +56,11 @@ impl Shader {
     }
 
     fn cleanup(&self, gl: &gl46::GlFns) {
-        unsafe { 
-            gl.DeleteShader(self.gl_shader);
-        }
+        gl.DeleteShader(self.gl_shader);
     }
 }
 
-struct ShaderProgram {
+pub struct ShaderProgram {
     pub program : GLuint,
     vertex : Shader,
     fragment : Shader,

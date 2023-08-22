@@ -24,7 +24,7 @@ pub const N_VERTEX_ATTRIBS: usize = 3;
 static LAST_MESH_UUID: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 // TODO: if locking the mutex slows GraphicsEngine::add_renderable(), use unsyncronized version of stuff
-static LOADED_MESHES: once_cell::sync::Lazy<std::sync::Mutex<std::collections::HashMap<usize, Mesh>>> = once_cell::sync::Lazy::new(|| {std::sync::Mutex::new(std::collections::HashMap::new())}); // key is mesh uuid, value is mesh
+pub static LOADED_MESHES: once_cell::sync::Lazy<std::sync::Mutex<std::collections::HashMap<usize, Mesh>>> = once_cell::sync::Lazy::new(|| {std::sync::Mutex::new(std::collections::HashMap::new())}); // key is mesh uuid, value is mesh
 
 // returns value to put into original size
 // makes all vertex coords in range -0.5 to 0.5
@@ -68,8 +68,6 @@ fn scale_vertices_into_range(vertices: &mut Vec<f32>) -> Vec3 {
         if i == 8 {i = 0}
     }
 
-    i = 0;
-
     let size = vec3((maxx-minx).abs(), (maxy-miny).abs(), (maxz-minz).abs());
     return size;
 }
@@ -95,7 +93,7 @@ impl Mesh {
     // returns mesh uuid, mesh itself can be accessed as needed (like if it's a dynamic mesh) by using uuid to index into LOADED_MESHES
     pub fn from_obj(path: &str, textureId: u32, shaderId: u32) -> usize {
         let options = tobj::LoadOptions {single_index: true, triangulate: true, ignore_points: true, ignore_lines: true};
-        let (models, materials) = tobj::load_obj(path, &options).expect(&("Failed to load OBJ file at path ".to_owned() + path));
+        let (models, _materials) = tobj::load_obj(path, &options).expect(&("Failed to load OBJ file at path ".to_owned() + path));
         let model = &models[0];
         
         // TODO: THIS IS PROBABLY SLOW

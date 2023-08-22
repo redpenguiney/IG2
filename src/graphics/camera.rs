@@ -1,6 +1,6 @@
 use glm::Mat4;
 
-use super::transform::Transform;
+use crate::transform::Transform;
 
 pub struct Camera {
     pub transform: Transform,

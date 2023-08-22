@@ -1,5 +1,7 @@
 use glfw::*;
 
+use super::INPUT;
+
 pub struct Window {
     pub name: String,
     pub size: (u32, u32),
@@ -7,11 +9,6 @@ pub struct Window {
     glfw_window: glfw::Window,
     glfw_instance: glfw::Glfw,
     event_reciever: std::sync::mpsc::Receiver<(f64, glfw::WindowEvent)>,
-
-    pub mouse_x: f64,
-    pub mouse_y: f64,
-    pub mouse_dx: f64,
-    pub mouse_dy: f64
 }
 
 impl Window {
@@ -35,11 +32,6 @@ impl Window {
             glfw_window: window,
             glfw_instance: instance,
             event_reciever: events,
-
-            mouse_x: pos.0,
-            mouse_y: pos.1,
-            mouse_dx: 0.0,
-            mouse_dy: 0.0
         };
     }
 
@@ -78,19 +70,20 @@ impl Window {
         //     }
         // }
         
-        let pos = self.glfw_window.get_cursor_pos();
-        self.mouse_dx = pos.0 - self.mouse_x;
-        self.mouse_dy = pos.1 - self.mouse_y;
-        self.mouse_x = pos.0;
-        self.mouse_y = pos.1;
+        let pos = self.glfw_window.get_cursor_pos(); // TODO: is f64 desired for mouse movement instead of f32? probably fine tho
+        let old_pos = INPUT.mouse_position();
+        INPUT.mouse_delta.write().unwrap().x = pos.0 as f32 - old_pos.x;
+        INPUT.mouse_delta.write().unwrap().y = pos.1 as f32 - old_pos.y;
+        INPUT.mouse_position.write().unwrap().x = pos.0 as f32;
+        INPUT.mouse_position.write().unwrap().y = pos.1 as f32;
         self.glfw_instance.poll_events();
 
-        // let mut press_began_keys = INPUT.press_began_keys.write().unwrap();
-        // let mut press_ended_keys = INPUT.press_ended_keys.write().unwrap();
-        // let mut pressed_keys = INPUT.pressed_keys.write().unwrap();
+        let mut press_began_keys = INPUT.press_began_keys.write().unwrap();
+        let mut press_ended_keys = INPUT.press_ended_keys.write().unwrap();
+        let mut pressed_keys = INPUT.pressed_keys.write().unwrap();
 
-        // press_began_keys.clear();
-        // press_ended_keys.clear();
+        press_began_keys.clear();
+        press_ended_keys.clear();
         for (_, event) in glfw::flush_messages(&self.event_reciever) {
             match event {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
@@ -98,13 +91,13 @@ impl Window {
                     
                 },
                 glfw::WindowEvent::Key(Key, _, glfw::Action::Press, _) => {
-                    // press_began_keys.insert(Key, true);
-                    // pressed_keys.insert(Key, true);
+                    press_began_keys.insert(Key, true);
+                    pressed_keys.insert(Key, true);
                     //println!("Key {:?} was pressed", Key);
                 },
                 glfw::WindowEvent::Key(Key, _, glfw::Action::Release, _) => {
-                    // press_ended_keys.insert(Key, true);
-                    // pressed_keys.insert(Key, false);
+                    press_ended_keys.insert(Key, true);
+                    pressed_keys.insert(Key, false);
                     //println!("Key {:?} was released", Key);
                 },
                 _ => {}

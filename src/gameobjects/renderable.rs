@@ -1,4 +1,4 @@
-use nalgebra_glm::I64Vec3;
+use crate::*;
 
 pub trait Renderable: GameObject + crate::transform::ObjectTransform {
     fn set_rgba(&mut self, color: nalgebra_glm::Vec4);
