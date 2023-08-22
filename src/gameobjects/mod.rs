@@ -2,6 +2,14 @@
 pub use gameobject::*;
 pub use meshobject::*;
 pub use renderable::*;
+pub use collisions::*;
+pub use physmeshobject::*;
+pub use rigidbody::*;
+pub use rigidmeshobject::*;
 mod gameobject;
 mod meshobject;
 mod renderable;
+mod collisions;
+mod physmeshobject;
+mod rigidbody;
+mod rigidmeshobject;

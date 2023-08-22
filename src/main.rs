@@ -13,6 +13,8 @@ mod graphics;
 mod windowing;
 mod gameobjects;
 
+pub const WINDOW_NAME: &str = "IG2";
+
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
     application();
@@ -22,22 +24,30 @@ fn application() {
     println!("Initializing application.");
     //let mut GAMEOBJECTS: Vec<Rc<RefCell<dyn GameObject>>> = Vec::new();
     let mut WINDOW = windowing::Window::new(String::from("POG"));
-    let mut GE = graphics::GraphicsEngine::new(WINDOW.create_opengl_context(), WINDOW.size as (u32, u32));
+    let mut GE = graphics::GraphicsEngine::new(WINDOW.create_opengl_context(), WINDOW.resolution as (u32, u32));
     GE.freecam_override_enabled = true;
 
     println!("Starting main loop");
 
     let mesh = Mesh::from_obj("models/icosphere.obj", 0, GE.world_shader_id);
-    let test = Rc::new(RefCell::new(gameobjects::MeshObject::new(mesh)));
-    GE.add_renderable(test.clone());
+    for x in 0..10 {
+        for y in 0..10 {
+            for z in 0..10 {
+                let test = Rc::new(RefCell::new(gameobjects::MeshObject::new(mesh)));
+                GE.add_renderable(test.clone());
+                test.borrow_mut().transform.setpos_meters(dvec3(x as f64 * 3.0, y as f64 * 3.0, z as f64 * 3.0));
+            }
+        }
+    }
+    
     //GAMEOBJECTS.push(test.clone());
     
-    GE.camera.transform.setpos_meters(dvec3(0.0, 0.0, 10.0));
+    //GE.camera.transform.setpos_meters(dvec3(0.0, 0.0, 10.0));
 
     while !WINDOW.should_close() {
         WINDOW.update();
 
-        GE.update();
+        GE.update(WINDOW.resolution);
         GE.draw();
 
         WINDOW.swap_buffers(); // will block because vsync

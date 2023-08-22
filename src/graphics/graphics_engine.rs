@@ -71,7 +71,7 @@ impl GraphicsEngine {
             freecam_override_enabled: false,
             freecam_pitchyaw: vec2(0.0, 0.0),
             freecam_speed: 0,
-            freecam_transform: Transform::new(i64vec3(0, -3000000, -10000000)),
+            freecam_transform: Transform::new(i64vec3(0, 0, -3000000)),
 
             postproc_framebuffer_id: 0,
             postproc_shader_id: 0,
@@ -138,6 +138,7 @@ impl GraphicsEngine {
 
     pub fn update_resolution(&mut self, resolution: (u32, u32)) {
         self.resolution = resolution;
+        self.framebuffers[&self.postproc_framebuffer_id].cleanup(&self.gl);
         let postproc_framebuffer = Framebuffer::new(&self.gl, resolution.0, resolution.1, true, false);
         self.postproc_framebuffer_id = postproc_framebuffer.gl_framebuffer;
         self.load_framebuffer(postproc_framebuffer);
@@ -165,7 +166,10 @@ impl GraphicsEngine {
     }
 
     // does floating origin, updates instanced data buffers, sets camera matrices, all prerendering work
-    pub fn update(&mut self) {
+    pub fn update(&mut self, resolution: (u32, u32)) {
+        if self.resolution != resolution {
+            self.update_resolution(resolution);
+        }
         self.update_freecam();
         self.add_cached_renderables();
         self.update_camera_matrices();

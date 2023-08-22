@@ -1,10 +1,12 @@
 use glfw::*;
 
+use crate::WINDOW_NAME;
+
 use super::INPUT;
 
 pub struct Window {
     pub name: String,
-    pub size: (u32, u32),
+    pub resolution: (u32, u32),
 
     glfw_window: glfw::Window,
     glfw_instance: glfw::Glfw,
@@ -16,7 +18,7 @@ impl Window {
         let mut instance = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
         instance.window_hint(glfw::WindowHint::ContextVersion(4, 6)); //todo: no dis bad
         instance.window_hint(glfw::WindowHint::Samples(Some(4)));
-        let (mut window, events) = instance.create_window(500, 500, "iron_game test", glfw::WindowMode::Windowed)
+        let (mut window, events) = instance.create_window(500, 500, WINDOW_NAME, glfw::WindowMode::Windowed)
             .expect("Failed to create GLFW window.");
 
         window.set_key_polling(true);
@@ -27,7 +29,7 @@ impl Window {
         let pos: (f64, f64) = window.get_cursor_pos();
         return Self {
             name: name,
-            size: (500, 500),
+            resolution: (500, 500),
 
             glfw_window: window,
             glfw_instance: instance,
@@ -61,7 +63,7 @@ impl Window {
     // polls events and handles screen resize
     pub fn update(&mut self) {
         let size = self.glfw_window.get_size();
-        self.size = (size.0 as u32, size.1 as u32);
+        self.resolution = (size.0 as u32, size.1 as u32);
         let pos = self.glfw_window.get_pos();
         // // OpenGL needs to know if the window changed size/position
         // if cfg!(not(target_os = "macos")) {
