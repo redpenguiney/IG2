@@ -13,12 +13,16 @@ pub struct GraphicsEngine {
     pub world_shader_id: u32,
     pub camera: Camera,
 
+    // draw everything to this framebuffer's texture, then render a quad to the screen with that texture so we can do post proc
+    postproc_texture_framebuffer: Framebuffer, 
+    postproc_shader_id: u32,
+
     renderable_gameobjects: HashMap<usize, Rc<RefCell<dyn Renderable>>>,
 
     pools: HashMap<GLuint /*(shader program id)*/, HashMap<u32 /*(texture/texture array id)*/, Vec<MeshPool>>>,
     shaders: HashMap<u32, ShaderProgram>, // key is program id
     textures: HashMap<u32, Texture>, // key is gl texture id
-    framebuffers: HashMap<u32, Framebuffer>, // key is gl framebuffer id
+    //framebuffers: HashMap<u32, Framebuffer>, // key is gl framebuffer id
 
     // tells how to get to the drawing data for a particular object from its draw id
     object_drawing_data_locations: HashMap<usize, (u32, u32, usize, i32, i32)>, // tuple is (programid, textureid, index in vector, slot within meshpool, instance offset)
@@ -30,7 +34,7 @@ pub struct GraphicsEngine {
                             // hopefully cloning big meshes into this won't be slow, but if it's okay to do it once (to put mesh in vbo) its prob okay to do it twice
 
     //mesh_id_locations: HashMap<u32, u32>, // key is returned by add(), value is key for mesh_locations
-    
+
     last_draw_uuid: usize,
 
     screen_quad_vbo: u32,
@@ -38,19 +42,22 @@ pub struct GraphicsEngine {
 }
 
 impl GraphicsEngine {
-    pub fn new(gl_context: gl46::GlFns) -> Self {
+    pub fn new(gl_context: gl46::GlFns, resolution: (u32, u32)) -> Self {
+        let postproc_texture_framebuffer = Framebuffer::new(&gl_context, resolution.0, resolution.1, true, false);
         let mut ge = Self {
             gl: gl_context,
 
             world_shader_id: 0,
             camera: Camera::new(),
+            postproc_texture_framebuffer: postproc_texture_framebuffer,
+            postproc_shader_id: 0,
 
             renderable_gameobjects: HashMap::new(),
 
             pools: HashMap::new(),
             shaders: HashMap::new(),
             textures: HashMap::new(),
-            framebuffers: HashMap::new(),
+            //framebuffers: HashMap::new(),
             object_drawing_data_locations: HashMap::new(),
 
             cached_meshes_to_add: HashMap::new(),
@@ -60,8 +67,10 @@ impl GraphicsEngine {
             screen_quad_vbo: 0, 
             screen_quad_vao: 0,
         };
-
+        
+        ge.postproc_shader_id = ge.load_shader("shaders/postproc_vertex.glsl", "shaders/postproc_fragment.glsl", vec!["screenTexture"]);
         ge.world_shader_id = ge.load_shader("shaders/world_vertex.glsl", "shaders/world_fragment.glsl", vec!["textures", "shadowmap"]);
+        ge.setup_screen_quad();
 
         // make opengl track errors for us
         unsafe {
@@ -97,6 +106,11 @@ impl GraphicsEngine {
             self.gl.EnableVertexAttribArray(1);
             self.gl.VertexAttribPointer(1, 2, GL_FLOAT, false as u8, 16, 8 as *const c_void);
         }
+    }
+
+    pub fn update_resolution(&mut self, resolution: (u32, u32)) {
+        self.postproc_texture_framebuffer.cleanup(&self.gl);
+        self.postproc_texture_framebuffer = Framebuffer::new(&self.gl, resolution.0, resolution.1, true, false);
     }
 
     // returns shader id
@@ -148,9 +162,7 @@ impl GraphicsEngine {
             shader.cleanup(&self.gl);
         }
 
-        for (_, framebuffer) in self.framebuffers.iter() {
-            framebuffer.cleanup(&self.gl);
-        }
+        self.postproc_texture_framebuffer.cleanup(&self.gl);
 
         for (_, hashmapthing) in self.pools.iter_mut() {
             for (_, vecofpools) in hashmapthing.iter_mut() {
@@ -270,13 +282,44 @@ impl GraphicsEngine {
     }
 
     // Given the id of a framebuffer that covers the WHOLE screen, it will draw a quad with that framebuffer's color texture over the screen using the given shader 
-    fn present_framebuffer(&self, buffer_id: u32, shader_id: u32) {
+    fn present_framebuffer(&self, buffer: &Framebuffer, shader_id: u32) {
         unsafe {
-            let buffer = &self.framebuffers[&buffer_id];
             self.shaders[&shader_id].r#use(&self.gl);
             buffer.color.as_ref().unwrap().r#use(&self.gl, 0);
             self.gl.BindVertexArray(self.screen_quad_vao);
             self.gl.DrawArrays(GL_TRIANGLES, 0, 6);
         }
+    }
+
+    // draws everything associated with the given shader programs into the given framebuffer.
+    // shaders should probably actually be compatible with the given framebuffer
+    fn draw_to_framebuffer(&mut self, shader_ids: &Vec<GLuint>, buffer: &mut Framebuffer, windowresx: u32, windowresy: u32) { 
+        unsafe {
+            self.gl.CullFace(GL_BACK);
+        }
+        buffer.begin_render(&self.gl);
+        for id in shader_ids {
+            self.shaders[id].r#use(&self.gl);
+            if self.shaders[id].shadowmap_texture_index != -1 {
+                //println!("deploying shadowmap at loc {}", self.shaders.get_mut(id).unwrap().shadowmap_texture_index);
+                //self.shaders.get_mut(id).unwrap().matrix4x4(&"modelToLightSpace".to_string(), &self.spotlights[0].get_model_to_light_space(), false); // TODO: USE SSBO HERE SO WE CAN HAVE MORE THAN ONE LIGHT LOL
+                //self.shadowmap.depth.as_ref().unwrap().r#use(self.shaders.get_mut(id).unwrap().shadowmap_texture_index as u32);
+            }
+            let map = &self.pools[&id];
+            for (texture_id, vec) in map {
+                if *texture_id != 0 {
+                    self.textures[texture_id].r#use(&self.gl, 0); 
+                }
+                else { unsafe {
+                    //println!("skipping texture binding here lol");
+                    self.gl.BindTexture(GL_TEXTURE_2D, 0);
+                    self.gl.BindTexture(GL_TEXTURE_2D_ARRAY, 0);
+                }}
+                for pool in vec {
+                    pool.draw(&self.gl); 
+                }
+            }
+        }
+        buffer.finish_render(&self.gl, windowresx, windowresy)
     }
 }

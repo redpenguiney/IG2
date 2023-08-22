@@ -21,7 +21,7 @@ fn application() {
 
     //let mut GAMEOBJECTS: Vec<Rc<RefCell<dyn GameObject>>> = Vec::new();
     let mut WINDOW = windowing::Window::new(String::from("POG"));
-    let mut GE = graphics::GraphicsEngine::new(WINDOW.create_opengl_context());
+    let mut GE = graphics::GraphicsEngine::new(WINDOW.create_opengl_context(), WINDOW.size as (u32, u32));
 
     println!("Starting main loop");
 

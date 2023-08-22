@@ -2,7 +2,7 @@ use glfw::*;
 
 pub struct Window {
     pub name: String,
-    pub size: (i32, i32),
+    pub size: (u32, u32),
 
     glfw_window: glfw::Window,
     glfw_instance: glfw::Glfw,
@@ -69,7 +69,7 @@ impl Window {
     // polls events and handles screen resize
     pub fn update(&mut self) {
         let size = self.glfw_window.get_size();
-        self.size = size;
+        self.size = (size.0 as u32, size.1 as u32);
         let pos = self.glfw_window.get_pos();
         // // OpenGL needs to know if the window changed size/position
         // if cfg!(not(target_os = "macos")) {

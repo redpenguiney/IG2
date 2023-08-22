@@ -101,10 +101,10 @@ impl Framebuffer {
     }
 
     // Stop rendering to framebufer
-    pub fn finish_render(&self, gl: &gl46::GlFns, resX: i32, resY: i32) {
+    pub fn finish_render(&self, gl: &gl46::GlFns, resX: u32, resY: u32) {
         unsafe {
             gl.BindFramebuffer(GL_FRAMEBUFFER, 0);
-            gl.Viewport(0, 0, resX, resY);
+            gl.Viewport(0, 0, resX as i32, resY as i32);
             // check_graphics_errors();
         }
     }
