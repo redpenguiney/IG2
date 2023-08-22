@@ -12,6 +12,7 @@ mod transform;
 mod graphics;
 mod windowing;
 mod gameobjects;
+mod phys;
 
 pub const WINDOW_NAME: &str = "IG2";
 

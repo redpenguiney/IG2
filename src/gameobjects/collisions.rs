@@ -563,16 +563,16 @@ macro_rules! impl_collides {
 
                 // box-box, uses SAT 
                 // could be pretty easily adapted to any convex shape, although SAT does NOT scale for large meshes, should use GJK for that
-                else if self.collider_type == crate::engine::gameobjects::collisions::ColliderType::Box && other.get_collider_type() == crate::engine::gameobjects::collisions::ColliderType::Box {
-                    return crate::engine::gameobjects::collisions::collision_SAT(self, other);
+                else if self.collider_type == crate::gameobjects::ColliderType::Box && other.get_collider_type() == crate::engine::gameobjects::collisions::ColliderType::Box {
+                    return crate::gameobjects::collision_SAT(self, other);
                 }
                 
                 // sphere to box
-                else if (self.collider_type == crate::engine::gameobjects::collisions::ColliderType::Sphere && other.get_collider_type() == crate::engine::gameobjects::collisions::ColliderType::Box) || (self.collider_type == crate::engine::gameobjects::collisions::ColliderType::Box && other.get_collider_type() == crate::engine::gameobjects::collisions::ColliderType::Sphere) { 
+                else if (self.collider_type == crate::gameobjects::ColliderType::Sphere && other.get_collider_type() == crate::engine::gameobjects::collisions::ColliderType::Box) || (self.collider_type == crate::engine::gameobjects::collisions::ColliderType::Box && other.get_collider_type() == crate::engine::gameobjects::collisions::ColliderType::Sphere) { 
                     // transform both cube and sphere by same matrix so cube is at origin and unrotated 
-                    let cube: &dyn crate::Collides;
-                    let sphere: &dyn crate::Collides;
-                    if self.collider_type == crate::engine::gameobjects::collisions::ColliderType::Sphere {
+                    let cube: &dyn crate::gameobjects::Collides;
+                    let sphere: &dyn crate::gameobjects::Collides;
+                    if self.collider_type == crate::gameobjects::ColliderType::Sphere {
                         sphere = self;
                         cube = other;
                     }

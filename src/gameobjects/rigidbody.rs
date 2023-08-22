@@ -2,7 +2,8 @@ use std::{sync::{Arc, Mutex}};
 
 use glm::{Vec3, vec3, I64Vec3, Quat};
 
-use crate::engine::{transform::{Transform, ObjectTransform}, gameobject::GameObject};
+use crate::transform::*;
+use crate::gameobjects::*;
 
 use super::collisions::Collides;
 
@@ -64,14 +65,14 @@ pub trait RigidBody: GameObject + ObjectTransform + Collides {
 #[macro_export]
 macro_rules! impl_rigidbody {
     ($structname: ident) => {
-        impl crate::engine::gameobjects::rigidbody::RigidBody for $structname {
+        impl crate::gameobjects::RigidBody for $structname {
             fn impulse(&mut self, force: glm::Vec3) {
                 // F/M = A
                 
                 let A = force/self.mass();
                 //println!("A = {:?}", A);
                 //println!("A = {:?}", A);
-                *self.velocity_mut() += crate::engine::transform::i64vec3_from_vec3(&A);
+                *self.velocity_mut() += crate::transform::i64vec3_from_vec3(&A);
             }
 
             fn impulse_at_pos(&mut self, force: glm::Vec3, rel_pos: glm::I64Vec3) {
@@ -80,7 +81,7 @@ macro_rules! impl_rigidbody {
             }
 
             fn torque_from_force_at_pos(&mut self, force: Vec3, rel_pos: I64Vec3) {
-                let rel_pos_f32 =crate::engine::transform::vec3_from_i64vec3(&rel_pos);
+                let rel_pos_f32 =crate::transform::vec3_from_i64vec3(&rel_pos);
                 let torque_dir = rel_pos_f32.cross(&force);
                 let torque_mag = rel_pos_f32.magnitude() * (force.magnitude() * rel_pos_f32.normalize().angle(&force.normalize()).sin());
                 //println!("TorqueDir = {:?}, DirMag = {:?}, TorqueMag = {}", torque_dir, torque_dir.magnitude(), torque_mag);
@@ -97,7 +98,7 @@ macro_rules! impl_rigidbody {
 
             // TODO: PROBABLY VERY SLOW
             fn inertia_tensor(&self) -> glm::Vec3 {
-                return crate::phys::inertia_tensor::moment_of_inertia(self.collider_type, self.transform.scl(), self.mass())
+                return crate::phys::moment_of_inertia(self.collider_type, self.transform.scl(), self.mass())
             }
 
             // fn inertia_tensor_mut(&mut self) -> &mut glm::Vec3 {
@@ -122,7 +123,7 @@ macro_rules! impl_rigidbody {
             fn local_velocity_at_point(&self, point_in_local_space: glm::Vec3) -> glm::I64Vec3 {
                 let direction = self.angular_velocity().cross(&point_in_local_space);
                 let r = point_in_local_space.magnitude();
-                return crate::engine::transform::i64vec3_from_vec3(&(direction * r));
+                return crate::transform::i64vec3_from_vec3(&(direction * r));
             }
 
             fn density(&self) -> f32 {

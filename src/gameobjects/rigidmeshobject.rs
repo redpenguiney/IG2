@@ -1,17 +1,17 @@
-use glm::{Vec4, vec4, quat_identity, I64Vec3, Quat, Vec3, vec3};
+use glm::{Vec4, vec4, I64Vec3, Vec3, vec3};
 
-use crate::{engine::{transform::{Transform, ObjectTransform, i64vec3}, gameobject::GameObject, core::EngineAPIs, graphics::universal::mesh::Mesh, gameobjects::collisions::Collides}, impl_collides, impl_renderable, impl_rigidbody, impl_transform, impl_gameobject};
-
-use super::{renderable::Renderable, collisions::ColliderType, rigidbody::RigidBody};
+use crate::transform::*;
+use crate::gameobjects::*;
 
 pub struct RigidMeshObject {
     pub name: String,
     pub transform: Transform,
     color: Vec4,
-    texz: f32,
-    mesh_id: u32,
+    texture_z: f32,
+    mesh_id: usize, // uuid of Mesh, so we know when two cube meshes/etc. are the same and can be instanced
+    draw_id: usize, //uuid for this individual object that will be drawn so it can be removed
     color_changed: bool,
-    texz_changed: bool,
+    texture_z_changed: bool,
 
     pub density: f32,
     pub friction: f32,
@@ -24,37 +24,20 @@ pub struct RigidMeshObject {
 
 }
 
-impl GameObject for RigidMeshObject {
-    impl_gameobject!(RigidMeshObject);
-
-    fn update(&mut self, apis: &mut crate::engine::core::EngineAPIs, gameobjects: &mut Vec<Box<dyn GameObject>>) {
-        
-    }
-
-    fn update_threaded(&mut self, apis: &mut crate::engine::core::EngineAPIs) {
-        //println!("SMH i am at {:?}", &self as *const _);
-        self.mesh_update(apis);
-        // println!("upda");
-    }
-
-    fn destroy(&mut self, apis: &mut crate::engine::core::EngineAPIs) {
-        
-    }
-}
-
 impl RigidMeshObject {
-    pub fn new(apis: &mut EngineAPIs, mesh: Box<&Mesh>, texture_z: f32, collider_type: ColliderType) -> Self {
+    pub fn new(mesh_id: usize, collider_type: ColliderType) -> Self {
         let mut obj = Self { 
             
             name: String::from("RigidMeshObject"),
-            mesh_id: apis.mesh_master.add(&mesh, 1),
+            mesh_id: mesh_id,
+            draw_id: 0,
 
             transform: Transform::empty(), 
             color: vec4(0.6, 0.6, 0.6, 0.5),
-            texz: texture_z,
+            texture_z: -1.0,
 
             color_changed: true,
-            texz_changed: true,
+            texture_z_changed: true,
             collider_type: collider_type,
 
             density: 1.0,
@@ -77,7 +60,8 @@ impl RigidMeshObject {
     }
 }
 
-impl_collides!(RigidMeshObject);
-impl_renderable!(RigidMeshObject);
-impl_rigidbody!(RigidMeshObject);
-impl_transform!(RigidMeshObject);
+crate::impl_gameobject!(RigidMeshObject);
+crate::impl_collides!(RigidMeshObject);
+crate::impl_renderable!(RigidMeshObject);
+crate::impl_rigidbody!(RigidMeshObject);
+crate::impl_transform!(RigidMeshObject);
