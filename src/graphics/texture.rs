@@ -23,7 +23,7 @@ impl Texture {
             match result {
                 LoadResult::Error(message) => {panic!("Failure to load image with path {}, loader said {}", path, message);}
                 LoadResult::ImageU8(image) => {
-                    println!("ok");
+                    //println!("ok");
                     
                     let mut tex: u32 = 0;
                     gl.GenTextures(1, &tex as *const u32 as *mut u32); // check_graphics_errors(gl);
@@ -38,7 +38,6 @@ impl Texture {
                         gl.TexImage2D(target, 0, GL_RGBA.0 as i32, image.width as i32, image.height as i32, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.data.as_ptr() as *const c_void);
                     }     
                     else {
-                        println!("here, size {}", image.data.len());
                         gl.TexStorage3D(target, 1, GL_RGBA8, image.width as i32, image.width as i32, (image.height/image.width) as i32);
                         // check_graphics_errors(gl);
                         gl.TexSubImage3D(target, 0, 0, 0, 0, image.width as i32, image.width as i32, (image.height/image.width) as i32, source_format, GL_UNSIGNED_BYTE, image.data.as_ptr() as *const c_void);

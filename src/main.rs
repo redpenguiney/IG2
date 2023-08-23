@@ -36,7 +36,7 @@ fn application() {
     let mesh = Mesh::from_obj("models/icosphere.obj", grass_id, GE.world_shader_id);
     for x in -10..10 {
         for y in -10..10 {
-            for z in 5..25 {
+            for z in 5..10 {
                 let test = Rc::new(RefCell::new(gameobjects::MeshObject::new(mesh)));
                 GE.add_renderable(test.clone());
                 test.borrow_mut().transform.setpos_meters(dvec3(x as f64 * 3.0, y as f64 * 3.0, z as f64 * 3.0));

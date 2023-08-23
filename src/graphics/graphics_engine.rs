@@ -199,8 +199,13 @@ impl GraphicsEngine {
     pub fn draw(&mut self) {
         unsafe {
             self.gl.Clear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            self.gl.Enable(GL_DEPTH_TEST);
         }
         self.draw_to_framebuffer(&vec![self.world_shader_id], self.postproc_framebuffer_id, self.resolution);
+        unsafe {
+            self.gl.Clear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            self.gl.Disable(GL_DEPTH_TEST);
+        }
         self.present_framebuffer(self.postproc_framebuffer_id, self.postproc_shader_id);
     }
 
@@ -363,7 +368,6 @@ impl GraphicsEngine {
             }
             let map = &self.pools[&id];
             for (texture_id, vec) in map {
-                println!("Id {}", texture_id);
                 if *texture_id != 0 {
                     self.textures[texture_id].r#use(&self.gl, 0); 
                 }
