@@ -363,6 +363,7 @@ impl GraphicsEngine {
             }
             let map = &self.pools[&id];
             for (texture_id, vec) in map {
+                println!("Id {}", texture_id);
                 if *texture_id != 0 {
                     self.textures[texture_id].r#use(&self.gl, 0); 
                 }
@@ -417,7 +418,6 @@ impl GraphicsEngine {
             
             if INPUT.is_pressed(Key::A) || INPUT.is_pressed(Key::D) || INPUT.is_pressed(Key::S) || INPUT.is_pressed(Key::W) || INPUT.is_pressed(Key::Q) || INPUT.is_pressed(Key::E) {
                 self.freecam_speed += 1;
-                println!("OMG ");
             }
             else {
                 self.freecam_speed = 0;

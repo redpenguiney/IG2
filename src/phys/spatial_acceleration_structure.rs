@@ -1,14 +1,13 @@
 // based on https://www.cs.nmsu.edu/~joshagam/Solace/papers/master-writeup-print.pdf
 // used for fast broadphase collision detection, efficiently figuring out what could be colliding without doing expensive math
-// todo: this uses so many pointers and is so unsafe
-// ALSO NOT THREAD SAFE
-// although the given pointers are just to ObjectTransform, they MUST actually point to things that implement Collides
 
-#[allow(invalid_reference_casting)] // TODO: LINE 141 SPATIAL ACCELERATION STRUCTURE; use unsafe cell instead of casting &T to &mut T which is apparently UB in the nightlies
+// URGENT TODO: UPDATE SAS WHEN OBJECT MOVES/DIES, ACTUALLY SPLIT NODES
+// TODO: WE GOT RID OF GAMEOBJECT POINTERS, BUT IS IT FAST?
+// STILL HAS SOME UNSAFE CODE
 
 const SPLIT_THRESHOLD : usize = 10; // leaf node becomes internal and its contents are divided across 8 new leaves when it contains this many gameobjects
 
-use std::{ops::Add, ptr::{null_mut, null}, collections::HashMap, fmt::Display};
+use std::{ops::Add, ptr::{null_mut, null}, collections::HashMap, fmt::Display, rc::Rc, cell::RefCell};
 
 use glm::{I64Vec3, vec3};
 
@@ -29,16 +28,16 @@ impl SpatialAccelerationStructure {
         return Self {nodes: Vec::new(), obj_locations: HashMap::new()};
     }
 
-    pub fn insert(&mut self, obj: *mut dyn Collides, transform: &Transform) {
+    pub fn insert(&mut self, obj: Rc<RefCell<dyn Collides>>) {
         println!("BEGINNING INSERTION");
-        let bbox = AABB::new(transform);
+        let bbox = AABB::new(obj.borrow().transform());
 
         if self.nodes.is_empty() {
             self.nodes.push(Node { 
                 aabb: bbox.clone(), 
                 parent: null_mut(),
                 children: Vec::new(), 
-                gameobject_ptrs: vec![obj],
+                gameobject_refs: vec![obj],
                 gameobject_aabbs: vec![bbox],
                 cannot_split: false
             }); 
@@ -55,10 +54,10 @@ impl SpatialAccelerationStructure {
         loop {
             if n.children.is_empty() { // if we're at a leaf in the tree then the object goes in here
                 backtrace.push(n as *mut Node);
-                n.gameobject_ptrs.push(obj);
+                self.obj_locations.insert(obj.as_ptr(), n as *mut Node);
+                n.gameobject_refs.push(obj);
                 n.gameobject_aabbs.push(bbox.clone());
-                n.cannot_split = false;
-                self.obj_locations.insert(obj, n as *mut Node);
+                n.cannot_split = false;          
                 break;
             }
             else { 
@@ -119,7 +118,7 @@ impl SpatialAccelerationStructure {
         
     // }
 
-    pub fn query_aabb(&mut self, bbox: &AABB) -> Vec<*mut dyn Collides> {
+    pub fn query_aabb(&mut self, bbox: &AABB) -> Vec<Rc<RefCell<dyn Collides>>> {
         if self.nodes.is_empty() {return Vec::new()}
         //println!("Querying acceleration structure for bounding box {}", bbox);
         let mut n = &self.nodes[0]; // start at root node
@@ -151,7 +150,7 @@ impl SpatialAccelerationStructure {
         
     }
 
-    fn get_touching(&self, node: &Node, aabb: &AABB, vec: &mut Vec<*mut dyn Collides>) {
+    fn get_touching(&self, node: &Node, aabb: &AABB, vec: &mut Vec<Rc<RefCell<dyn Collides>>>) {
         for child in &node.children {
             self.get_touching(unsafe{&**child}, aabb, vec);
             //println!("i will be mad if this prints");
@@ -161,7 +160,7 @@ impl SpatialAccelerationStructure {
         for obj_aabb in node.gameobject_aabbs.iter() {
             //println!(" a");
             if obj_aabb.touches(aabb) {
-                vec.push(node.gameobject_ptrs[i]);
+                vec.push(node.gameobject_refs[i].clone());
             }
             else {
                 //println!("AABB {} doesn't touch AABB {}", obj_aabb, aabb);
@@ -181,7 +180,7 @@ struct Node {
     parent: *mut Node,
     children: Vec<*mut Node>,
 
-    gameobject_ptrs: Vec<*mut dyn Collides>,
+    gameobject_refs: Vec<Rc<RefCell<dyn Collides>>>,
     gameobject_aabbs: Vec<AABB>,
 
     cannot_split: bool // if splitting tried to put all gameobjects in the same child (bc they're all in exact same pos, this is set to true until node is modified and we can try again)
