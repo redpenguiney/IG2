@@ -32,7 +32,7 @@ fn application() {
 
     println!("Starting main loop");
 
-    let (grass_id, _size) = GE.load_texture_from_file("textures/grass.png", graphics::TextureType::Tex2D);
+    let (grass_id, _size) = GE.load_texture_from_file("textures/grass.png", graphics::TextureType::TexArray2D);
     let mesh = Mesh::from_obj("models/icosphere.obj", grass_id, GE.world_shader_id);
     for x in -10..10 {
         for y in -10..10 {
@@ -40,6 +40,7 @@ fn application() {
                 let test = Rc::new(RefCell::new(gameobjects::MeshObject::new(mesh)));
                 GE.add_renderable(test.clone());
                 test.borrow_mut().transform.setpos_meters(dvec3(x as f64 * 3.0, y as f64 * 3.0, z as f64 * 3.0));
+                test.borrow_mut().set_texture_z(0.0);
             }
         }
     }
@@ -50,6 +51,7 @@ fn application() {
     floor.borrow_mut().set_rgba(vec4(0.4, 0.6, 0.4, 1.0));
     floor.borrow_mut().transform.setpos_meters(dvec3(0.0, -10.0, 0.0));
     floor.borrow_mut().transform.setscl(vec3(10.0, 1.0, 10.0));
+    floor.borrow_mut().set_texture_z(0.0);
     SAS.insert(floor.clone());
     GE.add_renderable(floor);
     

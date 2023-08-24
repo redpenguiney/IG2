@@ -104,7 +104,7 @@ impl MeshPool {
         *instanced_data_capacity += base_instanced_data_capacity*size;
         *n_available_instances += base_instanced_data_capacity as usize*size as usize;
         available_instanced_data_slots_vec.resize(*instanced_data_capacity as usize, true);
-        let flags = GL_MAP_PERSISTENT_BIT|/*GL_MAP_COHERENT_BIT|*/GL_MAP_WRITE_BIT;
+        let flags = GL_MAP_PERSISTENT_BIT|GL_MAP_COHERENT_BIT|GL_MAP_WRITE_BIT;
         // self.model_matrices.resize_with(self.instanced_data_capacity as usize, ||{glm::identity()});
 
         unsafe {

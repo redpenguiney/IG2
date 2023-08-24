@@ -93,16 +93,23 @@ impl GraphicsEngine {
         };
         
         ge.postproc_shader_id = ge.load_shader("shaders/postproc_vertex.glsl", "shaders/postproc_fragment.glsl", vec!["screenTexture"]);
-        let postproc_framebuffer = Framebuffer::new(&ge.gl, resolution.0, resolution.1, true, false);
+        let postproc_framebuffer = Framebuffer::new(&ge.gl, resolution.0, resolution.1, true, true);
         ge.postproc_framebuffer_id = postproc_framebuffer.gl_framebuffer;
         ge.load_framebuffer(postproc_framebuffer);
         ge.world_shader_id = ge.load_shader("shaders/world_vertex.glsl", "shaders/world_fragment.glsl", vec!["textures", "shadowmap"]);
         ge.setup_screen_quad();
 
-        // make opengl track errors for us
+        
         unsafe {
+            // make opengl track errors for us
             ge.gl.Enable(gl46::GL_DEBUG_OUTPUT);
             ge.gl.DebugMessageCallback(Some(opengl_debug_callback), std::ptr::null());
+
+            // tell opengl how to combine colors
+            //ge.gl.Enable(GL_BLEND);
+            //ge.gl.BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+            // make sky pretty
             ge.gl.ClearColor(0.5, 0.5, 0.8, 1.0);
         }
 
@@ -170,7 +177,7 @@ impl GraphicsEngine {
         if self.resolution != resolution {
             self.update_resolution(resolution);
         }
-        self.update_freecam();
+
         self.add_cached_renderables();
         self.update_camera_matrices();
 
@@ -194,6 +201,12 @@ impl GraphicsEngine {
                 self.pools.get(&loc.0).unwrap().get(&loc.1).unwrap().get(loc.2).unwrap().set_texture_z(loc.3, loc.4, &obj.get_texture_z());
             };
         }
+
+        // ensure that the gpu has the most up-to-date data 
+        // unsafe {
+        //     let sync = self.gl.FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, gl46::GLbitfield(0));
+        //     self.gl.ClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000000 );
+        // }
     }
 
     pub fn draw(&mut self) {
@@ -391,10 +404,8 @@ impl GraphicsEngine {
         }
         let mut cam_mat = self.camera.transform.get_model(&self.camera.transform.pos());
 
-        if self.freecam_override_enabled {
-            self.update_freecam();
-            cam_mat = self.freecam_transform.get_model(&self.freecam_transform.pos());
-        }
+        self.update_freecam();
+        cam_mat = self.freecam_transform.get_model(&self.freecam_transform.pos());
 
         for program in self.shaders.iter_mut() {
             if program.1.auto_cam {
