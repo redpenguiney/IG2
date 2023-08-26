@@ -2,6 +2,7 @@ use crate::Renderable;
 use crate::graphics::*;
 use crate::windowing::*;
 use crate::transform::*;
+use std::time::Duration;
 use std::{cell::RefCell, rc::Rc};
 use std::collections::HashMap;
 use gl46::*;
@@ -111,6 +112,10 @@ impl GraphicsEngine {
 
             // make sky pretty
             ge.gl.ClearColor(0.5, 0.5, 0.8, 1.0);
+
+            // backface culling
+            ge.gl.Enable(GL_CULL_FACE);
+            ge.gl.CullFace(GL_BACK);
         }
 
         return ge;
@@ -127,8 +132,6 @@ impl GraphicsEngine {
      // Sets up vbo/vao for a quad that covers the screen, so we can render a texture to it for postproc
     pub fn setup_screen_quad(&mut self) {
         unsafe {
-            self.gl.Enable(GL_DEPTH_TEST);
-
             self.gl.GenBuffers(1, &mut self.screen_quad_vbo as *const u32 as *mut u32);
             self.gl.GenVertexArrays(1, &mut self.screen_quad_vao as *const u32 as *mut u32);
             self.gl.BindBuffer(GL_ARRAY_BUFFER, self.screen_quad_vbo);
@@ -206,6 +209,7 @@ impl GraphicsEngine {
         // unsafe {
         //     let sync = self.gl.FenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, gl46::GLbitfield(0));
         //     self.gl.ClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000000 );
+        //     std::thread::sleep(Duration::from_millis(100));
         // }
     }
 
