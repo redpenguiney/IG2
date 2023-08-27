@@ -34,8 +34,8 @@ fn application() {
 
     let (grass_id, _size) = GE.load_texture_from_file("textures/grass.png", graphics::TextureType::TexArray2D);
     let mesh = Mesh::from_obj("models/icosphere.obj", grass_id, GE.world_shader_id);
-    for x in -1..10 {
-        for y in -1..10 {
+    for x in -1..100 {
+        for y in -1..100 {
             for z in 5..10 {
                 let test = Rc::new(RefCell::new(gameobjects::MeshObject::new(mesh)));
                 GE.add_renderable(test.clone());

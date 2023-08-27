@@ -3,6 +3,7 @@ use crate::graphics::*;
 use crate::windowing::*;
 use crate::transform::*;
 use std::time::Duration;
+use std::time::Instant;
 use std::{cell::RefCell, rc::Rc};
 use std::collections::HashMap;
 use gl46::*;
@@ -191,6 +192,7 @@ impl GraphicsEngine {
         }
         camera_pos *= -1;
 
+        let start = Instant::now();
         for (_, obj_refcell) in self.renderable_gameobjects.iter_mut() {
             let obj = obj_refcell.borrow();
             let draw_id = obj.get_draw_id();
@@ -204,6 +206,8 @@ impl GraphicsEngine {
                 self.pools.get(&loc.0).unwrap().get(&loc.1).unwrap().get(loc.2).unwrap().set_texture_z(loc.3, loc.4, &obj.get_texture_z());
             };
         }
+        let elapsed = start.elapsed();
+        println!("Updating {} renderables took {:?} ({:?} per renderable)", self.renderable_gameobjects.len(), elapsed, elapsed/(self.renderable_gameobjects.len() as u32));
 
         // ensure that the gpu has the most up-to-date data 
         // unsafe {
@@ -224,6 +228,18 @@ impl GraphicsEngine {
             self.gl.Disable(GL_DEPTH_TEST);
         }
         self.present_framebuffer(self.postproc_framebuffer_id, self.postproc_shader_id);
+
+        // calling this somehow prevents weird artifacts created by moving objects (which thanks to floating origin, happens whenever camera moves)
+
+        // I suspect this is because flushing tells opengl that we are done sending requests and that opengl should finish all commands we gave it, instead of waiting to batch 
+        // them up with future commands. I think that before, there were a few draw commands left over at the end of each frame that weren't being processed until
+        // more draw commands were given next frame, and thus those every frame a few objects were being drawn using the positions from last frame. 
+        // Maybe. But it works now so idc.
+        unsafe {
+            self.gl.Flush(); 
+
+            
+        }
     }
 
     pub fn cleanup(&mut self) {

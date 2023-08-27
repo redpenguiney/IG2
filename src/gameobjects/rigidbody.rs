@@ -1,4 +1,3 @@
-use std::{sync::{Arc, Mutex}};
 
 use glm::{Vec3, vec3, I64Vec3, Quat};
 
@@ -6,10 +5,6 @@ use crate::transform::*;
 use crate::gameobjects::*;
 
 use super::collisions::Collides;
-
-enum ColliderType {
-    Box
-}
 
 // pub struct RigidBody<> {
 //     density: f32,
